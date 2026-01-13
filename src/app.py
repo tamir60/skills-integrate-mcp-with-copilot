@@ -8,8 +8,11 @@ for extracurricular activities at Mergington High School.
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
+from fastapi import Request
 import os
 from pathlib import Path
+import json
+import uuid
 
 app = FastAPI(title="Mergington High School API",
               description="API for viewing and signing up for extracurricular activities")
@@ -77,6 +80,19 @@ activities = {
     }
 }
 
+# Load admin credentials from json
+admins_file = current_dir / "admins.json"
+admins = {}
+if admins_file.exists():
+    try:
+        with open(admins_file, "r", encoding="utf-8") as f:
+            admins = json.load(f)
+    except Exception:
+        admins = {}
+
+# In-memory admin session tokens: token -> username
+admin_tokens = {}
+
 
 @app.get("/")
 def root():
@@ -130,3 +146,21 @@ def unregister_from_activity(activity_name: str, email: str):
     # Remove student
     activity["participants"].remove(email)
     return {"message": f"Unregistered {email} from {activity_name}"}
+
+
+@app.post("/admin/login")
+async def admin_login(request: Request):
+    data = await request.json()
+    username = data.get("username")
+    password = data.get("password")
+    # Basic check against admins.json
+    for t in admins.get("teachers", []):
+        if t.get("username") == username and t.get("password") == password:
+            token = str(uuid.uuid4())
+            admin_tokens[token] = username
+            return {"token": token}
+    raise HTTPException(status_code=401, detail="Invalid credentials")
+
+
+def is_admin_token_valid(token: str):
+    return token in admin_tokens

@@ -3,6 +3,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const activitySelect = document.getElementById("activity");
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
+  const adminForm = document.getElementById("admin-form");
+  const adminMessage = document.getElementById("admin-message");
+
+  // Admin token stored in localStorage
+  let adminToken = localStorage.getItem("adminToken") || null;
 
   // Function to fetch activities from API
   async function fetchActivities() {
@@ -74,12 +79,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const email = button.getAttribute("data-email");
 
     try {
+      const headers = {};
+      if (adminToken) headers["X-Admin-Token"] = adminToken;
+
       const response = await fetch(
         `/activities/${encodeURIComponent(
           activity
         )}/unregister?email=${encodeURIComponent(email)}`,
         {
           method: "DELETE",
+          headers,
         }
       );
 
@@ -157,4 +166,37 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Initialize app
   fetchActivities();
+
+  // Admin login handling
+  if (adminForm) {
+    adminForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const username = document.getElementById("admin-username").value;
+      const password = document.getElementById("admin-password").value;
+      try {
+        const res = await fetch("/admin/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password }),
+        });
+        const json = await res.json();
+        if (res.ok && json.token) {
+          adminToken = json.token;
+          localStorage.setItem("adminToken", adminToken);
+          adminMessage.textContent = "Logged in as " + username;
+          adminMessage.className = "success";
+        } else {
+          adminMessage.textContent = json.detail || "Login failed";
+          adminMessage.className = "error";
+        }
+        adminMessage.classList.remove("hidden");
+        setTimeout(() => adminMessage.classList.add("hidden"), 4000);
+      } catch (err) {
+        adminMessage.textContent = "Login failed";
+        adminMessage.className = "error";
+        adminMessage.classList.remove("hidden");
+        setTimeout(() => adminMessage.classList.add("hidden"), 4000);
+      }
+    });
+  }
 });
